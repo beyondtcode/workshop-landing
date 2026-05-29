@@ -1,0 +1,71 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Heebo', system-ui, sans-serif;
+  --color-bg: #08060f;
+  --color-purple: #a78bfa;
+  --color-purple-deep: #7c3aed;
+  --color-neon: #c8f542;
+  --color-muted: #9b93b8;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes hero-orb-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translate(-50%, 0) scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translate(-50%, 0) scale(1.05);
+  }
+}
+
+.hero-orb {
+  animation: hero-orb-pulse 8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-orb {
+    animation: none;
+  }
+}
+
+@keyframes urgency-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.urgency-highlight {
+  animation: urgency-pulse 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .urgency-highlight {
+    animation: none;
+  }
+}

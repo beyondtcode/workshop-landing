@@ -17,7 +17,7 @@ export default function GlowButton({
     <button
       type={type}
       onClick={onClick}
-      className={`rounded-xl px-6 py-3.5 text-base font-semibold transition-[colors,transform] hover:scale-[1.02] active:scale-[0.98] motion-reduce:hover:scale-100 motion-reduce:active:scale-100 ${variants[variant]} ${className}`}
+      className={`rounded-xl px-6 py-3.5 text-base font-semibold transition-[colors,transform] hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 motion-reduce:hover:scale-100 motion-reduce:active:scale-100 ${variants[variant]} ${className}`}
       {...props}
     >
       {children}

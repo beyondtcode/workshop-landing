@@ -1,5 +1,9 @@
-export const formUrl = 'https://wkf.ms/4uCYfL8'
+/** Replace with your company payment URL when ready */
+export const PAYMENT_URL = 'https://www.paypal.com'
 
-export function openRegistrationForm() {
-  window.open(formUrl, '_blank')
+export function scrollToRegistration() {
+  document.getElementById('registration')?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  })
 }

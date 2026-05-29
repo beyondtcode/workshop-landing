@@ -9,7 +9,7 @@ import Hero from './sections/Hero'
 import RegistrationForm from './sections/RegistrationForm'
 import Topics from './sections/Topics'
 import Urgency from './sections/Urgency'
-import { openRegistrationForm } from './utils/registrationForm'
+import { scrollToRegistration } from './utils/registrationForm'
 
 function StickyMobileCta() {
   return (
@@ -17,7 +17,7 @@ function StickyMobileCta() {
       <GlowButton
         variant="submit"
         className="w-full"
-        onClick={openRegistrationForm}
+        onClick={scrollToRegistration}
       >
         להרשמה מהירה
       </GlowButton>

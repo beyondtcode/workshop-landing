@@ -1,0 +1,6 @@
+[[redirects]]
+  from = "/api/monday/*"
+  to = "https://api.monday.com/:splat"
+  status = 200
+  force = true
+  headers = {X-From = "Netlify"}

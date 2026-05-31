@@ -1,13 +1,23 @@
 /** Short code from https://wkf.ms/4uCYfL8 — resolved to full token server-side in dev */
 export const MONDAY_FORM_TOKEN = import.meta.env.VITE_MONDAY_FORM_TOKEN || '4uCYfL8'
 
-/** Dev: Vite middleware (server-side, no CORS). Prod: set VITE_MONDAY_SUBMIT_URL to your backend. */
+/** Relative base — proxied by Netlify to api.monday.com (see netlify.toml). Never call api.monday.com from the browser. */
+export const MONDAY_API_BASE = '/api/monday'
+
+function toRelativeMondayUrl(url) {
+  if (!url || typeof url !== 'string') return null
+  if (url.startsWith(MONDAY_API_BASE)) return url
+  return url.replace(/^https?:\/\/api\.monday\.com/, MONDAY_API_BASE)
+}
+
+/** Dev: Vite middleware (server-side, no CORS). Prod: Netlify redirect proxy. */
 export const MONDAY_SUBMIT_URL =
-  import.meta.env.VITE_MONDAY_SUBMIT_URL || '/api/monday/submit'
+  toRelativeMondayUrl(import.meta.env.VITE_MONDAY_SUBMIT_URL) ||
+  `${MONDAY_API_BASE}/submit`
 
 const FORM_SCHEMA_URL =
-  import.meta.env.VITE_MONDAY_SCHEMA_URL ||
-  `/api/monday/schema?token=${encodeURIComponent(MONDAY_FORM_TOKEN)}`
+  toRelativeMondayUrl(import.meta.env.VITE_MONDAY_SCHEMA_URL) ||
+  `${MONDAY_API_BASE}/schema?token=${encodeURIComponent(MONDAY_FORM_TOKEN)}`
 
 export const MONDAY_QUESTION_IDS = {
   name: import.meta.env.VITE_MONDAY_QUESTION_NAME || '',

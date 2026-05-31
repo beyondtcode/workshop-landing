@@ -15,7 +15,7 @@ export default function RegistrationProgress({ currentStep }) {
             <li key={step.id} className="flex items-center">
               <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-3">
                 <span
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-300 ${
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-bold transition-all duration-300 ${
                     isActive
                       ? 'bg-purple-deep text-white shadow-[0_0_20px_rgba(167,139,250,0.45)] ring-2 ring-purple/50'
                       : isComplete
@@ -27,7 +27,7 @@ export default function RegistrationProgress({ currentStep }) {
                   {isComplete ? '✓' : step.id}
                 </span>
                 <span
-                  className={`text-sm font-semibold transition-colors duration-300 sm:text-base ${
+                  className={`text-base font-semibold transition-colors duration-300 sm:text-lg ${
                     isActive ? 'text-white' : isComplete ? 'text-neon' : 'text-muted'
                   }`}
                 >
@@ -52,7 +52,7 @@ export default function RegistrationProgress({ currentStep }) {
           )
         })}
       </ol>
-      <p className="mt-4 text-center text-xs text-muted sm:text-sm">
+      <p className="mt-4 text-center text-sm text-muted sm:text-base">
         שלב {currentStep} מתוך 2
       </p>
     </nav>

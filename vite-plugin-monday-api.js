@@ -1,3 +1,7 @@
+const MONDAY_REGISTRATION_DATE_COLUMN = 'date_mm3t9tbn'
+const MONDAY_PAYMENT_PROOF_COLUMN = 'file_mm3wf6wz'
+const MONDAY_PENDING_PAYMENT_STATUS = 'Pending Payment'
+
 async function resolveFormToken(shortOrToken) {
   if (shortOrToken.length > 20) return shortOrToken
   const res = await fetch(`https://wkf.ms/${shortOrToken}`, { redirect: 'follow' })
@@ -42,17 +46,63 @@ async function loadPublicFormConfig(shortOrToken) {
   }
 }
 
-async function submitViaMondayApiToken({ fullName, email, phone }, config) {
+async function uploadFileToColumn(itemId, columnId, fileBuffer, fileName, mimeType, apiToken) {
+  const blob = new Blob([fileBuffer], { type: mimeType })
+  const formData = new FormData()
+  formData.append(
+    'query',
+    `mutation ($item_id: ID!, $column_id: String!, $file: File!) {
+      add_file_to_column(item_id: $item_id, column_id: $column_id, file: $file) {
+        id
+      }
+    }`,
+  )
+  formData.append(
+    'variables',
+    JSON.stringify({
+      item_id: String(itemId),
+      column_id: columnId,
+    }),
+  )
+  formData.append('map', JSON.stringify({ file: 'variables.file' }))
+  formData.append('file', blob, fileName)
+
+  const response = await fetch('https://api.monday.com/v2/file', {
+    method: 'POST',
+    headers: { Authorization: apiToken },
+    body: formData,
+  })
+
+  const body = await response.json()
+
+  if (!response.ok || body.errors?.length) {
+    throw new Error(body.errors?.[0]?.message || 'Monday file upload failed')
+  }
+
+  return body.data?.add_file_to_column?.id
+}
+
+async function submitViaMondayApiToken(
+  { fullName, email, phone, paymentProof, status },
+  config,
+) {
   const apiToken = process.env.MONDAY_API_TOKEN
   const boardId = process.env.MONDAY_BOARD_ID
   if (!apiToken || !boardId) return null
 
+  const statusColumnId = process.env.MONDAY_STATUS_COLUMN_ID || 'status'
   const columnValues = {}
   if (config.map.email) {
     columnValues[config.map.email] = { email, text: email }
   }
   if (config.map.phone) {
     columnValues[config.map.phone] = { phone, countryShortName: 'IL' }
+  }
+  columnValues[MONDAY_REGISTRATION_DATE_COLUMN] = {
+    date: new Date().toISOString().split('T')[0],
+  }
+  columnValues[statusColumnId] = {
+    label: status || MONDAY_PENDING_PAYMENT_STATUS,
   }
 
   const query = `
@@ -91,7 +141,21 @@ async function submitViaMondayApiToken({ fullName, email, phone }, config) {
     throw new Error(body.errors?.[0]?.message || 'Monday API create_item failed')
   }
 
-  return { source: 'monday_api', itemId: body.data.create_item.id }
+  const itemId = body.data.create_item.id
+
+  if (paymentProof?.data) {
+    const fileBuffer = Buffer.from(paymentProof.data, 'base64')
+    await uploadFileToColumn(
+      itemId,
+      MONDAY_PAYMENT_PROOF_COLUMN,
+      fileBuffer,
+      paymentProof.name || 'payment-proof',
+      paymentProof.type || 'application/octet-stream',
+      apiToken,
+    )
+  }
+
+  return { source: 'monday_api', itemId, status: status || MONDAY_PENDING_PAYMENT_STATUS }
 }
 
 async function submitViaPublicForm(payload, token, region) {
@@ -150,6 +214,10 @@ function answersFromPayload(payload, map) {
       phone: { phone: digits, country_short_name: 'IL' },
     })
   }
+  answers.push({
+    question_id: 'date_mm3t9tbn',
+    date: { date: new Date().toISOString().split('T')[0] },
+  })
   return answers
 }
 
@@ -190,6 +258,8 @@ export function mondayApiPlugin() {
               fullName: body.fullName?.trim(),
               email: body.email?.trim(),
               phone: body.phone?.trim(),
+              paymentProof: body.paymentProof,
+              status: body.status || MONDAY_PENDING_PAYMENT_STATUS,
             }
             if (!contact.fullName) {
               contact.fullName = body.answers?.find((a) => a.name)?.name || ''
@@ -200,6 +270,12 @@ export function mondayApiPlugin() {
             if (!contact.phone) {
               contact.phone =
                 body.answers?.find((a) => a.phone)?.phone?.phone || ''
+            }
+
+            if (!contact.paymentProof?.data) {
+              res.statusCode = 400
+              res.end(JSON.stringify({ error: 'Payment proof file is required' }))
+              return
             }
 
             const hasApiCredentials =
@@ -249,7 +325,7 @@ export function mondayApiPlugin() {
             res.end(
               JSON.stringify({
                 error:
-                  'Monday public form API requires login from this server (401). Add MONDAY_API_TOKEN and MONDAY_BOARD_ID to .env for local dev.',
+                  'Payment proof upload requires MONDAY_API_TOKEN and MONDAY_BOARD_ID in .env.',
                 publicStatus: publicResult.response.status,
                 publicError: publicResult.body?.error,
               }),

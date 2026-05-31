@@ -1,9 +1,9 @@
 export default function GlassCard({ children, className = '', hover = false }) {
   return (
     <div
-      className={`rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-sm md:p-6 ${
+      className={`card-glow rounded-3xl border border-white/[0.12] bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-6 backdrop-blur-md md:p-7 ${
         hover
-          ? 'transition-[colors,transform] hover:-translate-y-0.5 hover:border-white/15 motion-reduce:hover:translate-y-0'
+          ? 'card-glow-hover transition-[box-shadow,transform,border-color] duration-300 hover:-translate-y-1 hover:border-white/20 motion-reduce:hover:translate-y-0'
           : ''
       } ${className}`}
     >

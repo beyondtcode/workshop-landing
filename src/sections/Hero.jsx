@@ -1,58 +1,50 @@
-import GlowButton from '../components/GlowButton'
-import { scrollToRegistration } from '../utils/registrationForm'
+import WorkshopIntro from './WorkshopIntro'
 
 export default function Hero() {
   return (
-    <header className="relative pt-8 pb-6 md:pt-12 md:pb-8">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+    <header className="relative pt-4 pb-8 md:pt-6 md:pb-10">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4 md:mb-10">
         <p
           dir="ltr"
-          className="text-lg font-bold tracking-tight sm:text-xl"
+          className="text-xl font-extrabold tracking-tight sm:text-2xl"
         >
           <span className="text-purple/70">[</span>
           <span className="text-white">beyond</span>
           <span className="text-purple/70">]</span>
           <span className="text-purple"> code</span>
         </p>
-        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs leading-snug text-muted">
+        <span className="rounded-full border border-purple/25 bg-purple/10 px-4 py-2 text-sm font-semibold leading-snug text-purple shadow-[0_0_24px_rgba(167,139,250,0.15)] sm:text-base">
           לנשים חרדיות בלבד
         </span>
       </div>
 
-      <div className="flex flex-col gap-6 md:gap-8">
-        <div className="space-y-4">
-          <h1 className="text-[clamp(1.75rem,5.5vw,3rem)] font-extrabold leading-[1.2] tracking-tight">
+      <div className="mb-10 flex flex-col gap-8 md:mb-12 md:gap-10">
+        <div className="max-w-3xl space-y-6 text-right">
+          <h1 className="text-[clamp(2.125rem,7vw,3.75rem)] font-extrabold leading-[1.1] tracking-tight text-pretty">
             <span className="block text-white">
-              עוברות את הראיון הבא שלך.
+              עוברת את הראיון הבא שלך.
             </span>
             <span
-              className="mt-2 block text-purple"
-              style={{ textShadow: '0 0 40px rgba(167, 139, 250, 0.35)' }}
+              className="mt-2 block text-gradient-purple sm:mt-3"
+              style={{ filter: 'drop-shadow(0 0 32px rgba(167, 139, 250, 0.4))' }}
             >
-              נקדה.
+              נקודה.
             </span>
           </h1>
 
-          <p className="text-lg font-semibold leading-relaxed text-neon md:text-xl">
-            בואי ללמוד את כללי המשחק!
-          </p>
-        </div>
-
-        <p className="text-base leading-relaxed text-muted md:text-lg">
-          סדנת ראיונות טכנולוגיים אסטרטגית: הכנה מעשית ופרקטית (100%
-          Hands-on).
-        </p>
-
-        <div className="pt-1 sm:pt-2">
-          <GlowButton
-            variant="primary"
-            onClick={scrollToRegistration}
-            className="w-full sm:w-auto sm:min-w-[220px]"
-          >
-            אני רוצה להירשם
-          </GlowButton>
+          <div className="space-y-4 border-r-2 border-purple/30 pr-5">
+            <p className="text-lg leading-[1.7] text-white/92 text-pretty sm:text-xl md:text-[1.35rem] md:leading-relaxed">
+              לקראת הראיון הראשון שלך? או מרגישה שאת ב&quot;לופ&quot; ראיונות
+              שלא מתקדם?
+            </p>
+            <p className="text-xl font-bold leading-[1.5] text-neon text-pretty sm:text-2xl md:text-[1.65rem] md:leading-relaxed">
+              בואי ללמוד את כללי המשחק!
+            </p>
+          </div>
         </div>
       </div>
+
+      <WorkshopIntro />
     </header>
   )
 }

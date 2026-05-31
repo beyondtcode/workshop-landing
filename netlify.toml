@@ -1,6 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
 [[redirects]]
-  from = "/api/monday/*"
-  to = "https://api.monday.com/:splat"
+  from = "/api/monday/schema"
+  to = "/.netlify/functions/monday-schema"
   status = 200
-  force = true
-  headers = {X-From = "Netlify"}
+
+[[redirects]]
+  from = "/api/monday/submit"
+  to = "/.netlify/functions/monday-submit"
+  status = 200

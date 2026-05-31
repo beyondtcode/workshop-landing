@@ -1,0 +1,295 @@
+const MONDAY_REGISTRATION_DATE_COLUMN = 'date_mm3t9tbn'
+const MONDAY_PAYMENT_PROOF_COLUMN = 'file_mm3wf6wz'
+const MONDAY_PENDING_PAYMENT_STATUS = 'Pending Payment'
+
+async function resolveFormToken(shortOrToken) {
+  if (shortOrToken.length > 20) return shortOrToken
+  const res = await fetch(`https://wkf.ms/${shortOrToken}`, { redirect: 'follow' })
+  const match = res.url.match(/\/forms\/([^/?]+)/)
+  return match?.[1] || shortOrToken
+}
+
+function parseFormDataFromHtml(html) {
+  const marker = 'window.form_data = '
+  const start = html.indexOf(marker)
+  if (start < 0) return null
+  const jsonStart = start + marker.length
+  const jsonEnd = html.indexOf('};', jsonStart)
+  if (jsonEnd < 0) return null
+  return JSON.parse(html.slice(jsonStart, jsonEnd + 1))
+}
+
+export async function loadPublicFormConfig(shortOrToken) {
+  const token = await resolveFormToken(shortOrToken)
+  const pageUrl = `https://forms.monday.com/forms/${token}?r=euc1`
+  const res = await fetch(pageUrl, {
+    headers: { Accept: 'text/html', 'User-Agent': 'workshop-landing-dev-proxy' },
+  })
+  const html = await res.text()
+  const formData = parseFormDataFromHtml(html)
+
+  if (!formData) return null
+
+  const columns = formData.included_columns || []
+  const byType = (type) => columns.find((c) => c.type === type)?.id
+
+  return {
+    token: formData.token,
+    region: formData.region || 'euc1',
+    boardViewId: formData.board_view_id,
+    map: {
+      name: byType('name') || 'name',
+      email: byType('email'),
+      phone: byType('phone'),
+    },
+    questions: columns.map((c) => ({ id: c.id, type: c.type, title: c.title })),
+  }
+}
+
+async function uploadFileToColumn(itemId, columnId, fileBuffer, fileName, mimeType, apiToken) {
+  const blob = new Blob([fileBuffer], { type: mimeType })
+  const formData = new FormData()
+  formData.append(
+    'query',
+    `mutation ($item_id: ID!, $column_id: String!, $file: File!) {
+      add_file_to_column(item_id: $item_id, column_id: $column_id, file: $file) {
+        id
+      }
+    }`,
+  )
+  formData.append(
+    'variables',
+    JSON.stringify({
+      item_id: String(itemId),
+      column_id: columnId,
+    }),
+  )
+  formData.append('map', JSON.stringify({ file: 'variables.file' }))
+  formData.append('file', blob, fileName)
+
+  const response = await fetch('https://api.monday.com/v2/file', {
+    method: 'POST',
+    headers: { Authorization: apiToken },
+    body: formData,
+  })
+
+  const body = await response.json()
+
+  if (!response.ok || body.errors?.length) {
+    throw new Error(body.errors?.[0]?.message || 'Monday file upload failed')
+  }
+
+  return body.data?.add_file_to_column?.id
+}
+
+async function submitViaMondayApiToken(
+  { fullName, email, phone, paymentProof, status },
+  config,
+) {
+  const apiToken = process.env.MONDAY_API_TOKEN
+  const boardId = process.env.MONDAY_BOARD_ID
+  if (!apiToken || !boardId) return null
+
+  const statusColumnId = process.env.MONDAY_STATUS_COLUMN_ID || 'status'
+  const columnValues = {}
+  if (config.map.email) {
+    columnValues[config.map.email] = { email, text: email }
+  }
+  if (config.map.phone) {
+    columnValues[config.map.phone] = { phone, countryShortName: 'IL' }
+  }
+  columnValues[MONDAY_REGISTRATION_DATE_COLUMN] = {
+    date: new Date().toISOString().split('T')[0],
+  }
+  columnValues[statusColumnId] = {
+    label: status || MONDAY_PENDING_PAYMENT_STATUS,
+  }
+
+  const query = `
+    mutation ($boardId: ID!, $itemName: String!, $columnValues: JSON!) {
+      create_item(
+        board_id: $boardId,
+        item_name: $itemName,
+        column_values: $columnValues,
+        create_labels_if_missing: true
+      ) {
+        id
+      }
+    }
+  `
+
+  const response = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: apiToken,
+      'API-Version': '2024-10',
+    },
+    body: JSON.stringify({
+      query,
+      variables: {
+        boardId,
+        itemName: fullName,
+        columnValues: JSON.stringify(columnValues),
+      },
+    }),
+  })
+
+  const body = await response.json()
+
+  if (!response.ok || body.errors?.length) {
+    throw new Error(body.errors?.[0]?.message || 'Monday API create_item failed')
+  }
+
+  const itemId = body.data.create_item.id
+
+  if (paymentProof?.data) {
+    const fileBuffer = Buffer.from(paymentProof.data, 'base64')
+    await uploadFileToColumn(
+      itemId,
+      MONDAY_PAYMENT_PROOF_COLUMN,
+      fileBuffer,
+      paymentProof.name || 'payment-proof',
+      paymentProof.type || 'application/octet-stream',
+      apiToken,
+    )
+  }
+
+  return { source: 'monday_api', itemId, status: status || MONDAY_PENDING_PAYMENT_STATUS }
+}
+
+async function submitViaPublicForm(payload, token, region) {
+  const url = 'https://forms.monday.com/api/forms/create_submission'
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Origin: 'https://forms.monday.com',
+      Referer: `https://forms.monday.com/forms/${token}?r=${region}`,
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const text = await response.text()
+  let body = null
+  try {
+    body = JSON.parse(text)
+  } catch {
+    body = { raw: text.slice(0, 300) }
+  }
+
+  return { response, body }
+}
+
+function answersFromPayload(payload, map) {
+  if (Array.isArray(payload.answers) && payload.answers.length) {
+    return payload.answers
+  }
+
+  const { fullName, email, phone } = payload
+  const answers = [{ question_id: map.name, name: fullName?.trim() }]
+  if (map.email && email) {
+    answers.push({ question_id: map.email, email: email.trim() })
+  }
+  if (map.phone && phone) {
+    const digits = String(phone).replace(/\D/g, '')
+    answers.push({
+      question_id: map.phone,
+      phone: { phone: digits, country_short_name: 'IL' },
+    })
+  }
+  answers.push({
+    question_id: 'date_mm3t9tbn',
+    date: { date: new Date().toISOString().split('T')[0] },
+  })
+  return answers
+}
+
+function jsonResponse(statusCode, payload) {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }
+}
+
+export async function handleMondaySchema(searchParams) {
+  const short = searchParams.get('token') || '4uCYfL8'
+  const config = await loadPublicFormConfig(short)
+  if (!config) {
+    return jsonResponse(502, { error: 'Could not parse public form config' })
+  }
+  return jsonResponse(200, config)
+}
+
+export async function handleMondaySubmit(body) {
+  const short = body.form_token || '4uCYfL8'
+  const config = await loadPublicFormConfig(short)
+  if (!config?.map?.name) {
+    return jsonResponse(502, { error: 'Could not load form configuration' })
+  }
+
+  const contact = {
+    fullName: body.fullName?.trim(),
+    email: body.email?.trim(),
+    phone: body.phone?.trim(),
+    paymentProof: body.paymentProof,
+    status: body.status || MONDAY_PENDING_PAYMENT_STATUS,
+  }
+  if (!contact.fullName) {
+    contact.fullName = body.answers?.find((a) => a.name)?.name || ''
+  }
+  if (!contact.email) {
+    contact.email = body.answers?.find((a) => a.email)?.email || ''
+  }
+  if (!contact.phone) {
+    contact.phone = body.answers?.find((a) => a.phone)?.phone?.phone || ''
+  }
+
+  if (!contact.paymentProof?.data) {
+    return jsonResponse(400, { error: 'Payment proof file is required' })
+  }
+
+  const hasApiCredentials =
+    process.env.MONDAY_API_TOKEN && process.env.MONDAY_BOARD_ID
+
+  if (hasApiCredentials) {
+    try {
+      const apiResult = await submitViaMondayApiToken(contact, config)
+      if (apiResult) {
+        return jsonResponse(200, { ok: true, ...apiResult })
+      }
+    } catch (apiError) {
+      return jsonResponse(502, {
+        error:
+          apiError instanceof Error
+            ? apiError.message
+            : 'Monday API submission failed',
+      })
+    }
+  }
+
+  const submissionPayload = {
+    form_token: config.token,
+    form_timezone_offset: body.form_timezone_offset ?? 0,
+    answers: answersFromPayload(body, config.map),
+  }
+
+  const publicResult = await submitViaPublicForm(
+    submissionPayload,
+    config.token,
+    config.region,
+  )
+
+  if (publicResult.response.ok) {
+    return jsonResponse(200, { ok: true, source: 'public_form', ...publicResult.body })
+  }
+
+  return jsonResponse(502, {
+    error:
+      'Payment proof upload requires MONDAY_API_TOKEN and MONDAY_BOARD_ID in .env.',
+    publicStatus: publicResult.response.status,
+    publicError: publicResult.body?.error,
+  })
+}

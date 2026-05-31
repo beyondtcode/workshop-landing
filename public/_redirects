@@ -1,1 +1,2 @@
-/api/monday/*  https://api.monday.com/:splat  200!
+/api/monday/schema  /.netlify/functions/monday-schema  200
+/api/monday/submit  /.netlify/functions/monday-submit  200
